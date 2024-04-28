@@ -1,0 +1,59 @@
+const exp = require('express');
+
+const bcryptjs=require('bcryptjs');
+const userApp = exp.Router();
+const jwt= require('jsonwebtoken')
+let usersCollection;
+let eventsCollection
+userApp.use((req,res,next)=>{
+    usersCollection=req.app.get('usersCollection');
+    eventsCollection=req.app.get('eventsCollection');
+    next();
+})
+
+
+
+userApp.post('/register',async(req,res)=>{
+    //get the new author
+    let newUser=req.body;
+    //check by duplicate user by username
+    let dbAuthor=await usersCollection.findOne({username:newUser.username})
+    if(dbAuthor!==null){
+        return res.send({message:"user already existed"})
+    }
+    //hash the password
+    let hashedPassword=await bcryptjs.hash(newUser.password,6)
+    //replace plain pwd with hash pwd
+    newUser.password=hashedPassword;
+    //save into db
+    await usersCollection.insertOne(newUser)
+    res.send({message:"User created",payload:newUser})//sending the response
+})
+
+userApp.post('/login',async(req,res)=>{
+    //get auhtor credit
+    const creObj=req.body
+    //verify username
+    let dbUser=await usersCollection.findOne({username:creObj.username})
+    //if user found or not
+    if(dbUser===null)
+    {
+        res.send({message:"Invalid username"})
+    }
+    //campare returns true if match else false
+    else{
+       let result =await bcryptjs.compare(creObj.password,dbUser.password)
+        //if pwd match or not
+        if(result===false)
+        {
+            res.send({message:"Invlid Password"})
+        }
+        else{
+            //create token
+            let signedToken=jwt.sign({username:dbUser.username},'abcde',{expiresIn:1500})
+            //send token as res
+            res.send({message:"login success",payload:signedToken})
+        }
+    }
+})
+module.exports = userApp;
